@@ -1,27 +1,20 @@
-const express = require('express');
+const request = require('supertest');
+const app = require('./app');
 
-const app = express();
+describe('GET /api', () => {
+  it('should return 200 with message', async () => {
+    const res = await request(app).get('/api');
 
-const PORT = 3000;
-
-app.use(express.static('public'));
-
-app.get('/api', (req, res) => {
-  res.json({
-    message: 'Hello from DevOps Lab App'
+    expect(res.statusCode).toBe(200);
+    expect(res.body.message).toContain('Hello');
   });
 });
 
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'UP'
+describe('GET /health', () => {
+  it('health check should return UP', async () => {
+    const res = await request(app).get('/health');
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe('UP');
   });
 });
-
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`App running on port ${PORT}`);
-  });
-}
-
-module.exports = app;
