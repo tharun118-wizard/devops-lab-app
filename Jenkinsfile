@@ -3,10 +3,10 @@ pipeline {
   agent any
 
   environment {
-    APP_NAME      = 'devops-lab-app'
-    DOCKER_IMAGE  = "${APP_NAME}:${BUILD_NUMBER}"
-    CONTAINER_NAME= 'devops-app-container'
-    APP_PORT      = '3000'
+    APP_NAME       = 'devops-lab-app'
+    DOCKER_IMAGE   = "${APP_NAME}:${BUILD_NUMBER}"
+    CONTAINER_NAME = 'devops-app-container'
+    APP_PORT       = '3000'
   }
 
   tools {
@@ -29,7 +29,7 @@ pipeline {
       steps {
         sh '''
           echo "Node version: $(node --version)"
-          echo "NPM version:  $(npm --version)"
+          echo "NPM version: $(npm --version)"
           npm ci
         '''
       }
@@ -42,7 +42,6 @@ pipeline {
       }
       post {
         always {
-          // Publish test results if junit reporter is configured
           echo 'Tests completed.'
         }
         failure {
@@ -60,7 +59,9 @@ pipeline {
             -t ${DOCKER_IMAGE} \
             -t ${APP_NAME}:latest \
             .
+
           echo "Image built: ${DOCKER_IMAGE}"
+
           docker images | grep ${APP_NAME}
         """
       }
@@ -70,11 +71,11 @@ pipeline {
     stage('🚀 Deploy') {
       steps {
         sh """
-          // Stop & remove old container if it exists
+          # Stop & remove old container if it exists
           docker stop ${CONTAINER_NAME} || true
-          docker rm   ${CONTAINER_NAME} || true
+          docker rm ${CONTAINER_NAME} || true
 
-          // Run new container
+          # Run new container
           docker run -d \
             --name ${CONTAINER_NAME} \
             -p ${APP_PORT}:3000 \
@@ -91,8 +92,9 @@ pipeline {
     stage('💚 Health Check') {
       steps {
         sh """
-          echo "Waiting 5s for app to start..."
+          echo "Waiting 5 seconds for app to start..."
           sleep 5
+
           curl -f http://localhost:${APP_PORT}/health \
             && echo "✅ App is healthy!" \
             || (echo "❌ Health check failed!" && exit 1)
@@ -106,14 +108,16 @@ pipeline {
     success {
       echo """
         ✅ PIPELINE SUCCEEDED
-        App : ${APP_NAME}
-        Build: #${BUILD_NUMBER}
-        URL  : http://localhost:${APP_PORT}
+        App   : ${APP_NAME}
+        Build : #${BUILD_NUMBER}
+        URL   : http://localhost:${APP_PORT}
       """
     }
+
     failure {
       echo '❌ PIPELINE FAILED — check console output above.'
     }
+
     always {
       sh 'docker image prune -f || true'
     }
