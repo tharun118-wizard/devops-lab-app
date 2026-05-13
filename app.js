@@ -1,21 +1,23 @@
 const express = require('express');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => {
-  res.status(200).json({
+const PORT = 3000;
+
+app.use(express.static('public'));
+
+app.get('/api', (req, res) => {
+  res.json({
     message: 'Hello from DevOps Lab App'
   });
 });
 
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  res.json({
     status: 'UP'
   });
 });
 
-// ONLY start server if file is run directly
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`App running on port ${PORT}`);

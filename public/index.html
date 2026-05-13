@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DevOps Lab App</title>
+
+  <style>
+    body{
+      margin:0;
+      height:100vh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:#0f172a;
+      color:white;
+      font-family:Arial;
+    }
+
+    .card{
+      background:#1e293b;
+      padding:40px;
+      border-radius:20px;
+      text-align:center;
+      box-shadow:0 0 20px rgba(0,0,0,0.4);
+    }
+
+    h1{
+      color:#38bdf8;
+    }
+
+    p{
+      color:#cbd5e1;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h1>🚀 DevOps Lab App</h1>
+
+    <p>CI/CD Pipeline Working Successfully</p>
+
+    <p id="status">Loading health status...</p>
+  </div>
+
+  <script>
+    fetch('/health')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("status").innerHTML =
+          "Health Status: " + data.status;
+      });
+  </script>
+
+</body>
+</html>
