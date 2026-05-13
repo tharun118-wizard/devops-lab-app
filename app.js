@@ -1,20 +1,32 @@
-const request = require('supertest');
-const app = require('./app');
+const express = require('express');
 
-describe('GET /api', () => {
-  it('should return 200 with message', async () => {
-    const res = await request(app).get('/api');
+const app = express();
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.message).toContain('Hello');
+const PORT = 3000;
+
+// Serve frontend
+app.use(express.static('public'));
+
+// API route
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'Hello from DevOps Lab App'
   });
 });
 
-describe('GET /health', () => {
-  it('health check should return UP', async () => {
-    const res = await request(app).get('/health');
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.status).toBe('UP');
+// Health route
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'UP'
   });
 });
+
+// Start server only if file is run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`App running on port ${PORT}`);
+  });
+}
+
+// Export app for testing
+module.exports = app;
