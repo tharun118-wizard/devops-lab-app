@@ -7,6 +7,12 @@ pipeline {
     DOCKER_IMAGE   = "${APP_NAME}:${BUILD_NUMBER}"
     CONTAINER_NAME = 'devops-app-container'
     APP_PORT       = '3000'
+
+    // Example secret text credential
+    // Create in Jenkins Credentials:
+    // Kind = Secret text
+    // ID   = api-secret-key
+    API_KEY = credentials('api-secret-key')
   }
 
   tools {
@@ -20,39 +26,108 @@ pipeline {
       steps {
         echo "Checking out branch: ${env.GIT_BRANCH}"
         checkout scm
-        sh 'ls -la && echo "--- Repository contents ---"'
+
+        sh '''
+          echo "--- Repository Contents ---"
+          ls -la
+        '''
       }
     }
 
     // ── STAGE 2: Install Dependencies ────────────
     stage('📦 Install Dependencies') {
       steps {
+
         sh '''
           echo "Node version: $(node --version)"
           echo "NPM version: $(npm --version)"
+
           npm ci
         '''
       }
     }
 
-    // ── STAGE 3: Run Tests ───────────────────────
-    stage('🧪 Run Tests') {
-      steps {
-        sh 'npm test -- --coverage'
-      }
-      post {
-        always {
-          echo 'Tests completed.'
+    // ── STAGE 3: Parallel Test Suite ─────────────
+    stage('🧪 Test Suite') {
+
+      parallel {
+
+        stage('Unit Tests') {
+          steps {
+            sh 'npm run test:unit'
+          }
         }
+
+        stage('Integration Tests') {
+          steps {
+            sh 'npm run test:integration'
+          }
+        }
+
+        stage('Lint Check') {
+          steps {
+            sh 'npm run lint'
+          }
+        }
+
+      }
+
+      post {
+
+        always {
+          echo 'All parallel tests completed.'
+        }
+
         failure {
-          echo '❌ Tests FAILED. Pipeline will not proceed to deploy.'
+          echo '❌ One or more tests failed.'
         }
       }
     }
 
-    // ── STAGE 4: Build Docker Image ──────────────
+    // ── STAGE 4: Multi-Version Testing ───────────
+    stage('🔁 Multi-Version Test') {
+
+      matrix {
+
+        axes {
+
+          axis {
+            name 'NODE_VERSION'
+            values '16', '18', '20'
+          }
+        }
+
+        stages {
+
+          stage('Test on Node Version') {
+
+            agent {
+              docker {
+                image "node:${NODE_VERSION}-alpine"
+              }
+            }
+
+            steps {
+
+              sh '''
+                echo "Running tests on Node ${NODE_VERSION}"
+
+                node --version
+
+                npm ci
+                npm test
+              '''
+            }
+          }
+        }
+      }
+    }
+
+    // ── STAGE 5: Build Docker Image ──────────────
     stage('🐳 Build Docker Image') {
+
       steps {
+
         sh """
           docker build \
             --build-arg BUILD_NUMBER=${BUILD_NUMBER} \
@@ -60,19 +135,51 @@ pipeline {
             -t ${APP_NAME}:latest \
             .
 
-          echo "Image built: ${DOCKER_IMAGE}"
+          echo "Docker image built successfully."
 
           docker images | grep ${APP_NAME}
         """
       }
     }
 
-    // ── STAGE 5: Deploy Container ────────────────
-    stage('🚀 Deploy') {
+    // ── STAGE 6: Push to Docker Hub ──────────────
+    stage('☁️ Push to Docker Hub') {
+
       steps {
+
+        withCredentials([usernamePassword(
+          credentialsId: 'dockerhub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+
+          sh """
+            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+
+            docker tag ${DOCKER_IMAGE} ${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}
+
+            docker tag ${DOCKER_IMAGE} ${DOCKER_USER}/${APP_NAME}:latest
+
+            docker push ${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}
+
+            docker push ${DOCKER_USER}/${APP_NAME}:latest
+
+            docker logout
+          """
+        }
+      }
+    }
+
+    // ── STAGE 7: Deploy Container ────────────────
+    stage('🚀 Deploy') {
+
+      steps {
+
         sh """
-          # Stop & remove old container if it exists
+         # Stop old container
           docker stop ${CONTAINER_NAME} || true
+
+          # Remove old container
           docker rm ${CONTAINER_NAME} || true
 
           # Run new container
@@ -80,45 +187,68 @@ pipeline {
             --name ${CONTAINER_NAME} \
             -p ${APP_PORT}:3000 \
             -e BUILD_NUMBER=${BUILD_NUMBER} \
+            -e API_KEY=${API_KEY} \
             --restart unless-stopped \
             ${DOCKER_IMAGE}
 
-          echo "Deployed at: http://localhost:${APP_PORT}"
+          echo "Application deployed successfully!"
+          echo "URL: http://localhost:${APP_PORT}"
         """
       }
     }
 
-    // ── STAGE 6: Health Check ────────────────────
+    // ── STAGE 8: Health Check ────────────────────
     stage('💚 Health Check') {
+
       steps {
+
         sh """
-          echo "Waiting 5 seconds for app to start..."
+          echo "Waiting for app startup..."
           sleep 5
 
-          docker exec ${CONTAINER_NAME} wget -q -O- http://localhost:3000/health
+          echo "Running health check..."
+
+          docker exec ${CONTAINER_NAME} \
+          wget -q -O- http://localhost:3000/health
         """
       }
     }
 
   }
 
+  // ── POST ACTIONS ───────────────────────────────
   post {
+
     success {
+
       echo """
-        ✅ PIPELINE SUCCEEDED
-        App   : ${APP_NAME}
-        Build : #${BUILD_NUMBER}
-        URL   : http://localhost:${APP_PORT}
+      ✅ PIPELINE SUCCEEDED
+
+      App Name : ${APP_NAME}
+      Build No : #${BUILD_NUMBER}
+      URL      : http://localhost:${APP_PORT}
+
+      Docker Hub Image:
+      ${APP_NAME}:${BUILD_NUMBER}
       """
     }
 
     failure {
-      echo '❌ PIPELINE FAILED — check console output above.'
+
+      echo """
+      ❌ PIPELINE FAILED
+
+      Check Jenkins console logs for details.
+      """
     }
 
     always {
-      sh 'docker image prune -f || true'
+
+      sh '''
+        echo "Cleaning unused Docker images..."
+
+        docker image prune -f || true
+      '''
     }
   }
-
 }
