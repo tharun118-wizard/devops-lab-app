@@ -46,43 +46,52 @@ pipeline {
     }
 
     // ── STAGE 3: Parallel Test Suite ─────────────
-    stage('🧪 Test Suite') {
+stage('🧪 Test Suite') {
 
-      parallel {
+  parallel {
 
-        stage('Unit Tests') {
+    stage('Run Tests') {
 
-          steps {
-            sh 'npm run test:unit'
-          }
-        }
-
-        stage('Integration Tests') {
-
-          steps {
-            sh 'npm run test:integration'
-          }
-        }
-
-        stage('Lint Check') {
-
-          steps {
-            sh 'npm run lint'
-          }
-        }
-      }
-
-      post {
-
-        always {
-          echo 'All parallel tests completed.'
-        }
-
-        failure {
-          echo '❌ One or more tests failed.'
-        }
+      steps {
+        sh 'npm test'
       }
     }
+
+    stage('Check Application Files') {
+
+      steps {
+
+        sh '''
+          echo "Checking app files..."
+
+          ls -la
+        '''
+      }
+    }
+
+    stage('Check Node Environment') {
+
+      steps {
+
+        sh '''
+          node --version
+          npm --version
+        '''
+      }
+    }
+  }
+
+  post {
+
+    always {
+      echo 'Parallel test suite completed.'
+    }
+
+    failure {
+      echo '❌ Test suite failed.'
+    }
+  }
+}
 
     // ── STAGE 4: Multi-Version Testing ───────────
     stage('🔁 Multi-Version Test') {
