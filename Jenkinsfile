@@ -7,12 +7,6 @@ pipeline {
     DOCKER_IMAGE   = "${APP_NAME}:${BUILD_NUMBER}"
     CONTAINER_NAME = 'devops-app-container'
     APP_PORT       = '3000'
-
-    // Example secret text credential
-    // Create in Jenkins Credentials:
-    // Kind = Secret text
-    // ID   = api-secret-key
-    API_KEY = credentials('api-secret-key')
   }
 
   tools {
@@ -23,8 +17,11 @@ pipeline {
 
     // ── STAGE 1: Checkout ────────────────────────
     stage('📁 Checkout') {
+
       steps {
+
         echo "Checking out branch: ${env.GIT_BRANCH}"
+
         checkout scm
 
         sh '''
@@ -36,6 +33,7 @@ pipeline {
 
     // ── STAGE 2: Install Dependencies ────────────
     stage('📦 Install Dependencies') {
+
       steps {
 
         sh '''
@@ -53,23 +51,25 @@ pipeline {
       parallel {
 
         stage('Unit Tests') {
+
           steps {
             sh 'npm run test:unit'
           }
         }
 
         stage('Integration Tests') {
+
           steps {
             sh 'npm run test:integration'
           }
         }
 
         stage('Lint Check') {
+
           steps {
             sh 'npm run lint'
           }
         }
-
       }
 
       post {
@@ -102,6 +102,7 @@ pipeline {
           stage('Test on Node Version') {
 
             agent {
+
               docker {
                 image "node:${NODE_VERSION}-alpine"
               }
@@ -176,7 +177,7 @@ pipeline {
       steps {
 
         sh """
-         # Stop old container
+          # Stop old container
           docker stop ${CONTAINER_NAME} || true
 
           # Remove old container
@@ -187,7 +188,6 @@ pipeline {
             --name ${CONTAINER_NAME} \
             -p ${APP_PORT}:3000 \
             -e BUILD_NUMBER=${BUILD_NUMBER} \
-            -e API_KEY=${API_KEY} \
             --restart unless-stopped \
             ${DOCKER_IMAGE}
 
@@ -244,11 +244,21 @@ pipeline {
 
     always {
 
-      sh '''
-        echo "Cleaning unused Docker images..."
+      script {
 
-        docker image prune -f || true
-      '''
+        try {
+
+          sh '''
+            echo "Cleaning unused Docker images..."
+
+            docker image prune -f || true
+          '''
+
+        } catch (Exception e) {
+
+          echo "Skipping cleanup because workspace is unavailable."
+        }
+      }
     }
   }
 }
