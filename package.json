@@ -5,7 +5,10 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "test":  "jest --coverage --detectOpenHandles --forceExit",
+    "test":  "jest",
+    "test:unit":"jest tests/unit",
+    "test:integration":"jest tests/integration",
+    "lint":eslint .",
     "build": "echo 'Build step complete'"
   },
   "dependencies": {
